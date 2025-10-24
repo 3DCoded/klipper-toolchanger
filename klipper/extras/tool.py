@@ -39,18 +39,30 @@ class Tool:
         detect_pin_name = config.get('detection_pin', None)
         self.detect_state = toolchanger.DETECT_UNAVAILABLE
         if detect_pin_name:
-            self.printer.load_object(config, 'buttons').register_buttons([detect_pin_name], self._handle_detect)
+            self.printer.load_object(config, 'buttons').register_debounce_button(detect_pin_name, self._handle_detect, config)
             self.detect_state = toolchanger.DETECT_ABSENT
-        self.extruder_stepper_name = self._config_get(config, 'extruder_stepper', None)
-        self.extruder = None
-        self.extruder_stepper = None
+
         self.fan_name = self._config_get(config, 'fan', None)
         self.fan = None
         if self.fan_name:
             self.toolchanger.require_fan_switcher()
         self.t_command_restore_axis = self._config_get(
             config, 't_command_restore_axis', 'XYZ')
-        self.tool_number = config.getint('tool_number', -1, minval=0)
+        
+        default_tool_number = -1
+        if len(self.name.split()) == 2: # Handle [tool Tx]
+            if self.name.split()[1].isdecimal():
+                default_tool_number = int(self.name.split()[1])
+        self.tool_number = config.getint('tool_number', default_tool_number, minval=0)
+
+        default_extruder_stepper_name = None
+        if self.tool_number > 0:
+            default_extruder_stepper_name = f'extruder{self.tool_number}'
+        elif self.tool_number == 0:
+            default_extruder_stepper_name = 'extruder'
+        self.extruder_stepper_name = self._config_get(config, 'extruder_stepper', default_extruder_stepper_name)
+        self.extruder = None
+        self.extruder_stepper = None
 
         gcode = self.printer.lookup_object('gcode')
         gcode.register_mux_command("ASSIGN_TOOL", "TOOL", self.name,
