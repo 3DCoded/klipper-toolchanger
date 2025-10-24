@@ -123,13 +123,7 @@ class ToolProbeEndstop:
 
     cmd_DETECT_ACTIVE_TOOL_PROBE_help = "Detect which tool is active by identifying a probe that is NOT triggered"
     def cmd_DETECT_ACTIVE_TOOL_PROBE(self, gcmd):
-        num_retries = 0
-        active_tools = []
-        while len(active_tools) == 0:
-            active_tools = self._query_open_tools()
-            num_retries += 1
-            self.toolhead.dwell(.1)
-            if num_retries > 5: break
+        active_tools = self._query_open_tools()
         if len(active_tools) == 1 :
             active = active_tools[0]
             gcmd.respond_info("Found active tool probe: %s" % (active.name))
