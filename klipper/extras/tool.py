@@ -39,7 +39,7 @@ class Tool:
         detect_pin_name = config.get('detection_pin', None)
         self.detect_state = toolchanger.DETECT_UNAVAILABLE
         if detect_pin_name:
-            self.printer.load_object(config, 'buttons').register_debounce_button(detect_pin_name, self._handle_detect, config)
+            self.printer.load_object(config, 'buttons').register_buttons([detect_pin_name], self._handle_detect)
             self.detect_state = toolchanger.DETECT_ABSENT
 
         self.fan_name = self._config_get(config, 'fan', None)
