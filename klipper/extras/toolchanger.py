@@ -708,12 +708,18 @@ class FanSwitcher:
                 self.pending_speed = speed_to_set
 
     def cmd_M106(self, gcmd):
-        tool = self.toolchanger.gcmd_tool(gcmd, default=self.toolchanger.active_tool, extra_number_arg='P')
+        try:
+            tool = self.toolchanger.gcmd_tool(gcmd, default=self.toolchanger.active_tool, extra_number_arg='P')
+        except:
+            return # Slicer passed invalid fan number
         speed = gcmd.get_float('S', 255., minval=0.) / 255.
         self.set_speed(speed, tool)
 
     def cmd_M107(self, gcmd):
-        tool = self.toolchanger.gcmd_tool(gcmd, default=self.toolchanger.active_tool, extra_number_arg='P')
+        try:
+            tool = self.toolchanger.gcmd_tool(gcmd, default=self.toolchanger.active_tool, extra_number_arg='P')
+        except:
+            return # Slicer passed invalid fan number
         self.set_speed(0.0, tool)
 
     def set_speed(self, speed, tool):
