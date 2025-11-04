@@ -85,17 +85,29 @@ class ToolsCalibrate:
     def locate_sensor(self, gcmd):
         toolhead = self.printer.lookup_object('toolhead')
         position = toolhead.get_position()
-        downPos = self.probe_multi_axis.run_probe("z-", gcmd, samples=1)
-        center_x, center_y = self.calibrate_xy(toolhead, downPos, gcmd,
+
+        do_probe_xy = gcmd.get_int('PROBE_XY', 1)
+        z_samples = gcmd.get_int('Z_SAMPLES', 1, minval=1)
+
+        downPos = self.probe_multi_axis.run_probe("z-", gcmd, samples=z_samples)
+
+        center_x = position[0]
+        center_y = position[1]
+
+        if do_probe_xy:
+            center_x, center_y = self.calibrate_xy(toolhead, downPos, gcmd,
                                                samples=1)
 
         toolhead.manual_move([None, None, downPos[2] + self.lift_z],
-                             self.lift_speed)
-        toolhead.manual_move([center_x, center_y, None], self.travel_speed)
-        center_z = self.probe_multi_axis.run_probe("z-", gcmd, speed_ratio=0.5)[
+                             self.lift_speed) 
+        if do_probe_xy:
+            toolhead.manual_move([center_x, center_y, None], self.travel_speed)
+
+        center_z = self.probe_multi_axis.run_probe("z-", gcmd, speed_ratio=0.5, samples=z_samples)[
             2]
         # Now redo X and Y, since we have a more accurate center.
-        center_x, center_y = self.calibrate_xy(toolhead,
+        if do_probe_xy:
+            center_x, center_y = self.calibrate_xy(toolhead,
                                                [center_x, center_y, center_z],
                                                gcmd)
 
@@ -105,7 +117,7 @@ class ToolsCalibrate:
         position[2] = center_z + self.final_lift_z
         toolhead.manual_move([None, None, position[2]], self.lift_speed)
         toolhead.manual_move([position[0], position[1], None],
-                             self.travel_speed)
+                            self.travel_speed)
         toolhead.set_position(position)
         return [center_x, center_y, center_z]
 
