@@ -68,7 +68,10 @@ class ToolProbeEndstop:
     def add_probe(self, config, tool_probe):
         if (tool_probe.tool in self.tool_probes):
             raise config.error("Duplicate tool probe nr: %s" % (tool_probe.tool,))
-        self.tool_probes[tool_probe.tool] = tool_probe
+        if tool_probe.tool is None:
+            self.tool_probes[tool_probe.name] = tool_probe
+        else:
+            self.tool_probes[tool_probe.tool] = tool_probe
         self.mcu_probe.add_mcu(tool_probe.mcu_probe)
 
     def set_active_probe(self, tool_probe):
@@ -87,6 +90,8 @@ class ToolProbeEndstop:
         self.last_query.clear()
         candidates = []
         for tool_probe in self.tool_probes.values():
+            if tool_probe.name is None: # Bed leveling probe
+                continue
             triggered = tool_probe.mcu_probe.query_endstop(print_time)
             self.last_query[tool_probe.tool] = triggered
             if not triggered:
@@ -116,10 +121,10 @@ class ToolProbeEndstop:
 
     cmd_SET_ACTIVE_TOOL_PROBE_help = "Set the tool probe that will act as the Z endstop."
     def cmd_SET_ACTIVE_TOOL_PROBE(self, gcmd):
-        probe_nr = gcmd.get_int("T")
-        if (probe_nr not in self.tool_probes):
-            raise gcmd.error("SET_ACTIVE_TOOL_PROBE no tool probe for tool %d" % (probe_nr))
-        self.set_active_probe(self.tool_probes[probe_nr])
+        probe_id = gcmd.get_int("T", gcmd.get('PROBE', None))
+        if (probe_id not in self.tool_probes):
+            raise gcmd.error("SET_ACTIVE_TOOL_PROBE no tool probe for '%s'" % (probe_id))
+        self.set_active_probe(self.tool_probes[probe_id])
 
     cmd_DETECT_ACTIVE_TOOL_PROBE_help = "Detect which tool is active by identifying a probe that is NOT triggered"
     def cmd_DETECT_ACTIVE_TOOL_PROBE(self, gcmd):

@@ -8,7 +8,7 @@ from . import probe
 
 class ToolProbe:
     def __init__(self, config):
-        self.tool = config.getint('tool')
+        self.tool = config.getint('tool', None)
         self.printer = config.get_printer()
         self.name = config.get_name()
         self.mcu_probe = probe.ProbeEndstopWrapper(config)
