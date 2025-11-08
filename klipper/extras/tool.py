@@ -5,6 +5,7 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
 from . import toolchanger
+import logging
 
 class Tool:
 
@@ -88,7 +89,7 @@ class Tool:
         self.toolchanger.note_detect_change(self)
 
     def get_status(self, eventtime):
-        return {**self.params,
+        status = {**self.params,
                 'name': self.name,
                 'toolchanger': self.toolchanger.name,
                 'tool_number': self.tool_number,
@@ -100,6 +101,8 @@ class Tool:
                 'gcode_y_offset': self.gcode_y_offset if self.gcode_y_offset else 0.0,
                 'gcode_z_offset': self.gcode_z_offset if self.gcode_z_offset else 0.0,
                 }
+        # logging.info(f'tool status = {status}')
+        return status
 
     def get_offset(self):
         return [

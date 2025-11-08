@@ -4,6 +4,7 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 from . import probe
+import logging
 
 # Virtual endstop, using a tool attached Z probe in a toolchanger setup.
 # Tool endstop change may be done either via SET_ACTIVE_TOOL_PROBE TOOL=99
@@ -68,8 +69,8 @@ class ToolProbeEndstop:
     def add_probe(self, config, tool_probe):
         if (tool_probe.tool in self.tool_probes):
             raise config.error("Duplicate tool probe nr: %s" % (tool_probe.tool,))
-        if tool_probe.tool is None:
-            self.tool_probes[tool_probe.name] = tool_probe
+        if tool_probe.tool < 0:
+            self.tool_probes[tool_probe.name.split()[1]] = tool_probe
         else:
             self.tool_probes[tool_probe.tool] = tool_probe
         self.mcu_probe.add_mcu(tool_probe.mcu_probe)
@@ -90,7 +91,7 @@ class ToolProbeEndstop:
         self.last_query.clear()
         candidates = []
         for tool_probe in self.tool_probes.values():
-            if tool_probe.name is None: # Bed leveling probe
+            if tool_probe.tool < 0: # Bed leveling probe
                 continue
             triggered = tool_probe.mcu_probe.query_endstop(print_time)
             self.last_query[tool_probe.tool] = triggered
@@ -122,6 +123,8 @@ class ToolProbeEndstop:
     cmd_SET_ACTIVE_TOOL_PROBE_help = "Set the tool probe that will act as the Z endstop."
     def cmd_SET_ACTIVE_TOOL_PROBE(self, gcmd):
         probe_id = gcmd.get_int("T", gcmd.get('PROBE', None))
+        if probe_id is None:
+            raise gcmd.error("SET_ACTIVE_TOOL_PROBE requires T or PROBE parameter")
         if (probe_id not in self.tool_probes):
             raise gcmd.error("SET_ACTIVE_TOOL_PROBE no tool probe for '%s'" % (probe_id))
         self.set_active_probe(self.tool_probes[probe_id])
@@ -147,6 +150,7 @@ class ToolProbeEndstop:
         else:
             status['active_tool_probe'] = None
             status['active_tool_probe_z_offset'] = 0.0
+        # logging.info(f'tool_probe_endstop status = {status}')
         return status
 
     cmd_START_TOOL_PROBE_CRASH_DETECTION_help = "Start detecting tool crashes"

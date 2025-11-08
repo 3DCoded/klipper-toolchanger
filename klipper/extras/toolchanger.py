@@ -5,6 +5,7 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
 import ast, bisect
+import logging
 from unittest.mock import sentinel
 
 STATUS_UNINITALIZED = 'uninitialized'
@@ -131,7 +132,7 @@ class Toolchanger:
         self.active_tool = None
 
     def get_status(self, eventtime):
-        return {**self.params,
+        status = {**self.params,
                 'name': self.name,
                 'status': self.status,
                 'tool': self.active_tool.name if self.active_tool else None,
@@ -142,6 +143,8 @@ class Toolchanger:
                 'tool_names': self.tool_names,
                 'has_detection': self.has_detection,
                 }
+        # logging.info(f'toolchanger status = {status}')
+        return status
 
     def assign_tool(self, tool, number, prev_number, replace=False):
         if number in self.tools and not replace:
