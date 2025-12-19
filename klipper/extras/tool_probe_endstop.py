@@ -20,6 +20,7 @@ class ToolProbeEndstop:
         self.active_tool_number = -1
         self.gcode_macro = self.printer.load_object(config, 'gcode_macro')
         self.crash_detection_active = False
+        self.crash_count = 0
         self.crash_lasttime = 0.
         self.mcu_probe = EndstopRouter(self.printer)
         self.param_helper = probe.ProbeParameterHelper(config)
@@ -33,6 +34,7 @@ class ToolProbeEndstop:
         self.printer.add_object('probe', self)
 
         self.crash_mintime = config.getfloat('crash_mintime', 0.5, above=0.)
+        self.crash_maxcount = config.getint('crash_maxcount', 5) # each count is roughly one second
         self.crash_gcode = self.gcode_macro.load_template(config, 'crash_gcode', '')
         self.printer.register_event_handler("klippy:connect",
                                             self._handle_connect)
@@ -150,7 +152,13 @@ class ToolProbeEndstop:
         else:
             status['active_tool_probe'] = None
             status['active_tool_probe_z_offset'] = 0.0
-        # logging.info(f'tool_probe_endstop status = {status}')
+        logging.info(f'tool_probe_endstop status = {status}')
+        if self.crash_detection_active and self.last_query[self.active_tool_number]: # Crash triggered
+            self.crash_count += 1
+            if self.crash_count > self.crash_maxcount:
+                self.reactor.register_callback(self._probe_triggered_delayed)
+        else:
+            self.crash_count = 0
         return status
 
     cmd_START_TOOL_PROBE_CRASH_DETECTION_help = "Start detecting tool crashes"
@@ -176,21 +184,23 @@ class ToolProbeEndstop:
         self.crash_detection_active = False
 
     def note_probe_triggered(self, probe, eventtime, is_triggered):
-        if not self.crash_detection_active:
-            return
-        if probe != self.active_probe:
-            return
-        if is_triggered:
-            self.crash_lasttime = eventtime
-            self.reactor.register_callback(lambda _: self._probe_triggered_delayed(eventtime),
-                                           eventtime + self.crash_mintime)
-        else:
-            self.crash_lasttime = 0.
+        if probe.tool >= 0: # Actual tool probe
+            self.last_query[probe.tool] = is_triggered # Save last state
+        # if not self.crash_detection_active:
+        #     return
+        # if probe != self.active_probe:
+        #     return
+        # if is_triggered:
+        #     self.crash_lasttime = eventtime
+        #     self.reactor.register_callback(lambda _: self._probe_triggered_delayed(eventtime),
+        #                                    eventtime + self.crash_mintime)
+        # else:
+        #     self.crash_lasttime = 0.
 
     def _probe_triggered_delayed(self, expect_eventtime):
-        if self.crash_lasttime != expect_eventtime:
-            # The trigger was cancelled
-            return
+        # if self.crash_lasttime != expect_eventtime:
+        #     # The trigger was cancelled
+        #     return
         if self.crash_detection_active:
             self.crash_detection_active = False
             self.crash_gcode.run_gcode_from_command()
