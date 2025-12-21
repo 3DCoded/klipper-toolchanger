@@ -676,7 +676,7 @@ class Toolchanger:
             raise gcmd.error("VERIFY_TOOL_DETECTED: toolchanger not ready: status = %s", (self.status,))
 
     def on_heater_update(self, tool_id, target):
-        enable = (target is not None and float(target) > 0.0)
+        enable = (target is not None and target > 0.0)
         active_heaters = [t.tool_number for t in self.tools.values() if t.heater_active]
         self.gcode.respond_info(f'Heater T{tool_id} to {target}ºC: enable={enable}, active_heaters={active_heaters}')
 
