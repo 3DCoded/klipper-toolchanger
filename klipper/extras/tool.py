@@ -64,6 +64,7 @@ class Tool:
         self.extruder_stepper_name = self._config_get(config, 'extruder_stepper', default_extruder_stepper_name)
         self.extruder = None
         self.extruder_stepper = None
+        self.heater_active = False
 
         gcode = self.printer.lookup_object('gcode')
         gcode.register_mux_command("ASSIGN_TOOL", "TOOL", self.name,
@@ -76,6 +77,7 @@ class Tool:
     def _handle_connect(self):
         self.extruder = self.printer.lookup_object(
             self.extruder_name) if self.extruder_name else None
+        self.extruder_heater = self.extruder.heater
         self.extruder_stepper = self.printer.lookup_object(
             self.extruder_stepper_name) if self.extruder_stepper_name else None
         if self.fan_name:
@@ -83,6 +85,24 @@ class Tool:
                       self.printer.lookup_object("fan_generic " + self.fan_name))
         if self.tool_number >= 0:
             self.assign_tool(self.tool_number)
+        
+        # Temp update injection
+        def override_set_temp(degrees):
+            if self.toolchanger.on_heater_update(self.tool_number, degrees):
+                self.extruder_heater._set_temp(degrees)
+                self.heater_active = degrees > 0
+            else:
+                self.heater_active = False
+        
+        self.extruder_heater._set_temp = self.extruder_heater.set_temp
+        self.extruder_heater.set_temp = override_set_temp
+        
+        # Control PWM update injection preparation
+        self.extruder_heater._set_pwm = self.extruder.heater.set_pwm
+    
+    def _set_temp(self, degrees):
+        self.heater_active = degrees > 0
+        self.extruder_heater._set_temp(degrees)
 
     def _handle_detect(self, eventtime, is_triggered):
         self.detect_state = toolchanger.DETECT_PRESENT if is_triggered else toolchanger.DETECT_ABSENT

@@ -114,6 +114,9 @@ class Toolchanger:
                                     self.cmd_VERIFY_TOOL_DETECTED)
         self.fan_switcher = None
         self.validate_tool_timer = None
+        # Maximum number of extruder heaters allowed on at once (<=0 means unlimited)
+
+        self.max_heaters = config.getint('max_heaters', 1)
 
     def require_fan_switcher(self):
         if not self.fan_switcher:
@@ -671,6 +674,59 @@ class Toolchanger:
     def _ensure_toolchanger_ready(self, gcmd):
         if self.status not in [STATUS_READY, STATUS_CHANGING]:
             raise gcmd.error("VERIFY_TOOL_DETECTED: toolchanger not ready: status = %s", (self.status,))
+
+    def on_heater_update(self, tool_id, target):
+        enable = (target is not None and float(target) > 0.0)
+        active_heaters = [t.tool_number for t in self.tools.values() if t.heater_active]
+        self.gcode.respond_info(f'Heater T{tool_id} to {target}ºC: enable={enable}, active_heaters={active_heaters}')
+
+        # If just disabling, nothing special to do
+        if not enable:
+            self.set_heater_enable(tool_id, True)
+            return True
+    
+        # If we're below capacity, heat up as usual
+        if len(active_heaters) < self.max_heaters:
+            self.set_heater_enable(tool_id, True)
+            return True
+        
+        # If we're at capacity, disable one tool
+        if len(active_heaters) == self.max_heaters:
+            for tn in active_heaters:
+                if tn == tool_id: continue
+                if self.active_tool is None:
+                    self.set_heater_enable(tn, False)
+                    self.set_heater_enable(tool_id, True)
+                    return True
+                elif tn != self.active_tool.tool_number:
+                    self.set_heater_enable(tn, False)
+                    self.set_heater_enable(tool_id, True)
+                    return True # Now we can enable new heater
+        
+        # Safety: if we're above capacity, keep removing heaters until we're below capacity
+        while len(active_heaters) > self.max_heaters:
+            for tn in active_heaters:
+                if tn == tool_id: continue
+                if self.active_tool is None:
+                    self.set_heater_enable(tn, False)
+                    active_heaters.remove(tn)
+                elif tn != self.active_tool.tool_number:
+                    self.set_heater_enable(tn, False)
+                    active_heaters.remove(tn)
+        self.set_heater_enable(tool_id, True)
+        return True
+
+    def set_heater_enable(self, tool_id, enabled):
+        # extruder.heater.set_temp(degrees) override for on_heater_update
+        # extruder.heater.set_pwm(read_time, value) override to interrupt heating
+        if enabled:
+            # Restore normal control loop
+            self.tools[tool_id].extruder_heater.set_pwm = self.tools[tool_id].extruder_heater._set_pwm
+        else:
+            # PWM = 0 constantly
+            self.tools[tool_id]._set_temp(0) # Tell Klipper & KTC the heater is turning off
+            self.tools[tool_id].extruder_heater.set_pwm = lambda rt, v: self.tools[tool_id].extruder_heater._set_pwm(rt, 0)
+        return
 
 class FanSwitcher:
     def __init__(self, toolchanger, config):
