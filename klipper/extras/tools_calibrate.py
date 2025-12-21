@@ -119,7 +119,11 @@ class ToolsCalibrate:
         toolhead.manual_move([position[0], position[1], None],
                             self.travel_speed)
         toolhead.set_position(position)
-        return [center_x, center_y, center_z]
+        
+        if do_probe_xy:
+            return [center_x, center_y, self.last_result[2]]
+        else:
+            return [self.last_result[0], self.last_result[1], center_z]
 
     cmd_TOOL_LOCATE_SENSOR_help = ("Locate the tool calibration sensor, "
                                    "use with tool 0.")
@@ -134,15 +138,19 @@ class ToolsCalibrate:
     cmd_TOOL_CALIBRATE_TOOL_OFFSET_help = "Calibrate current tool offset relative to tool 0"
 
     def cmd_TOOL_CALIBRATE_TOOL_OFFSET(self, gcmd):
+        do_probe_xy = gcmd.get_int('PROBE_XY', 1)
         if not self.sensor_location:
             raise gcmd.error(
                 "No recorded sensor location, please run TOOL_LOCATE_SENSOR first")
         location = self.locate_sensor(gcmd)
-        self.last_result = [location[i] - self.sensor_location[i] for i in
+        if do_probe_xy:
+            self.last_result = [location[i] - self.sensor_location[i] for i in
                             range(3)]
-        self.gcode.respond_info("Tool offset is %.6f,%.6f,%.6f"
-                                % (self.last_result[0], self.last_result[1],
-                                   self.last_result[2]))
+        else:
+            self.last_result[2] = location[2] - self.sensor_location[2]
+            self.gcode.respond_info("Tool offset is %.6f,%.6f,%.6f"
+                                    % (self.last_result[0], self.last_result[1],
+                                    self.last_result[2]))
 
     cmd_TOOL_CALIBRATE_SAVE_TOOL_OFFSET_help = "Save tool offset calibration to config"
 
