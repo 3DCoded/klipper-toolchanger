@@ -152,7 +152,7 @@ class ToolProbeEndstop:
         else:
             status['active_tool_probe'] = None
             status['active_tool_probe_z_offset'] = 0.0
-        logging.info(f'tool_probe_endstop status = {status}')
+        # logging.info(f'tool_probe_endstop status = {status}')
         if self.crash_detection_active and self.last_query[self.active_tool_number]: # Crash triggered
             self.crash_count += 1
             if self.crash_count > self.crash_maxcount:
